@@ -1,0 +1,67 @@
+pipeline {
+    agent any 
+
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        CLUSTER_NAME = 'eks-cluster'
+        NODES_NUM = '2'
+        NAMESPACE = 'python-app'
+    }
+
+    stages {
+        stage('Create eks Cluster'){
+            steps {
+                // you will need to install Cloudbees AWS credenetials
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        // create eks cluster with eksctl
+                        sh ' eksctl create cluster --name $CLUSTER_NAME --region $AWS_DEFAULT_REGION --nodes-min=$NODES_NUM' 
+                    }
+
+            }
+        }
+
+        stage('Update Kubeconfig'){
+            steps{
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        // update kubeconfig file
+                        sh ' aws eks update-kubeconfig --name $CLUSTER_NAME' 
+                    }
+            }
+        }
+
+        stage('Create Namespace'){
+            steps{
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        //  create namespace for application
+                        sh ' kubectl create namespace $NAMESPACE' 
+                    }
+            }
+        }
+
+        stage('Trigger the Deployment Pipeline'){
+            steps{
+                script{
+                    build_job: 'DEPLOY_APP',
+                    parameters: [
+                    [ $class: 'StringParameterValue', name: 'DEPLOYMENT']
+                    ]
+                }
+            }
+        }
+    }
+}

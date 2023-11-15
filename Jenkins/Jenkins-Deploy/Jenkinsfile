@@ -1,0 +1,56 @@
+pipeline {
+    agent any 
+
+    parameters {
+        string(name: 'DEPLOYMENT')
+    }
+    environment {
+        CLUSTER_NAME = 'eks-cluster'
+    }
+    stages{
+        stage('Update Kubeconfig'){
+            steps{
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        // update kubeconfig file
+                        sh ' aws eks update-kubeconfig --name $CLUSTER_NAME' 
+                    }
+            }
+        }
+        stage('deploy app'){
+            steps{
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        // deploy kubernetes manifest files on eks cluster using kubectl
+                        sh """
+                        cd K8s
+                        kubectl -n python-app -f deployment.yml
+                        kubectl -n python-app -f service.yml
+                        """
+                        sleep(time: 120 , unit: "SECONDS")
+                    }
+            }
+        }
+        stage('Output the APP URL'){
+            steps{
+                withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY',
+                        credentialsId: 'aws_credentials_id'
+                    ]]) {
+                        // create eks cluster with eksctl
+                        sh ' aws elb describe-load-balancers | grep DNSName ' 
+                    }
+            }
+        }
+    }
+}

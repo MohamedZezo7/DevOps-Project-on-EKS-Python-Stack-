@@ -1,0 +1,25 @@
+---
+- name: automate the build and run the container
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: stop running containers
+    command: docker stop python-container
+    ignore_errors: yes
+  
+  - name: remove stopped containrs
+    command: docker rm python-container
+    ignore_errors: yes
+
+  - name: remove image
+    command: docker rmi mohamedabdelaziz10/survey-app-img
+    ignore_errors: yes
+
+  - name: build the image 
+    command: docker built -t mohamedabdelaziz10/survey-app-img .
+
+  - name: push the image 
+    command: docker push mohamedabdelaziz10/survey-app-img
+
+  - name: run container from image
+    command: docker run -d --name python-container -p 4000:8000 mohamedabdelaziz10/survey-app-img
